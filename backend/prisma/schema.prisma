@@ -15,6 +15,8 @@ model User {
 
   tickets  Ticket[] @relation("UserTickets")
   assigned Ticket[] @relation("AgentTickets")
+
+  comments Comment[]
 }
 
 model Ticket {
@@ -32,4 +34,29 @@ model Ticket {
   agentId Int?
 
   createdAt DateTime @default(now())
+
+  comments Comment[]
+
+  attachments Attachment[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  ticketId  Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Attachment {
+  id         Int      @id @default(autoincrement())
+  filename   String
+  path       String
+  ticketId   Int
+  uploadedAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
 }

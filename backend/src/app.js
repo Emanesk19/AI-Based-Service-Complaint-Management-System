@@ -7,6 +7,8 @@ const app = express();
 const router = express.Router();
 const authController = require("../src/controllers/auth.controller");
 const ticketRoutes = require("./routes/ticket.routes");
+const commentRoutes = require("./routes/comment.routes");
+const attachmentRoutes = require("./routes/attachment.routes");
 
 app.use(cors());
 app.use(express.json());
@@ -19,6 +21,8 @@ router.post("/login", authController.login);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/tickets", ticketRoutes);
+app.use("/api/comments", commentRoutes);
+app.use("/api/attachments", attachmentRoutes);
 
 
 module.exports = app;
