@@ -5,7 +5,7 @@ const hoursLeftToDueDate = (dueDate) => {
   return (new Date(dueDate) - new Date()) / (1000 * 60 * 60);
 };
 
-const calculateRiskScore = (ticket, stats) => {
+const calculateRiskScore = (ticket, stats, workloads) => {
   let score = 0;
   const reasoning = [];
 
@@ -60,6 +60,30 @@ const calculateRiskScore = (ticket, stats) => {
     score += 5;
     reasoning.push("Average user feedback is low, increasing caution");
   }
+if (ticket.agentId && workloads?.[ticket.agentId]) {
+  const agentLoad = workloads[ticket.agentId];
+
+  if (agentLoad.overloaded) {
+    score += 15;
+    reasoning.push(
+      `Assigned agent is overloaded (${agentLoad.activeTickets} active tickets)`
+    );
+  }
+}
+
+// Category performance impact
+if (stats?.categoryStats?.[ticket.category]) {
+  const cat = stats.categoryStats[ticket.category];
+
+  if (cat.avgResolutionHours && ticket.slaHours) {
+    if (cat.avgResolutionHours > ticket.slaHours) {
+      score += 15;
+      reasoning.push(
+        `Category '${ticket.category}' historically exceeds SLA`
+      );
+    }
+  }
+}
 
   score = clamp(score, 0, 100);
 

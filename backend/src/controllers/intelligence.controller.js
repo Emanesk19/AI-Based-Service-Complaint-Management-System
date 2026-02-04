@@ -10,8 +10,12 @@ exports.analyzeTicket = async (req, res) => {
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     const stats = await ticketStats.getStats();
+    const workloads = await ticketStats.getAgentWorkload();
+const categoryStats = await ticketStats.getCategoryStats();
+stats.categoryStats = categoryStats;
 
-    const { score, reasoning, confidence } = intelligence.calculateRiskScore(ticket, stats);
+    const { score, reasoning, confidence } =   intelligence.calculateRiskScore(ticket, stats, workloads);
+
     const slaRisk = intelligence.predictSlaBreach(score);
     const recommendations = intelligence.generateRecommendation(ticket, score);
 
