@@ -11,6 +11,7 @@ const commentRoutes = require("./routes/comment.routes");
 const attachmentRoutes = require("./routes/attachment.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
 const intelligenceRoutes = require("./routes/intelligence.routes");
+const chatbotRoutes = require("./routes/chatbot.routes");
 
 
 app.use(cors());
@@ -28,5 +29,6 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/attachments", attachmentRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
+app.use("/api/chat", chatbotRoutes);
 
 module.exports = app;
