@@ -3,20 +3,24 @@ function parseIntent(message) {
 
   if (/hello|hi|hey/.test(text)) return { intent: "greeting" };
 
-  if (/status.*ticket|ticket.*status/.test(text))
+  // Status
+  if (/status.*ticket|ticket.*status|status\?/.test(text))
     return { intent: "ticket_status" };
 
-  if (/why.*ticket|ticket.*delayed|delay/.test(text))
-    return { intent: "ticket_delay" };
-
-  if (/risk.*ticket|ticket.*risk/.test(text))
+  // Risk / delay (IMPORTANT FIX)
+  if (
+    /risk|risky|at risk|delay|delayed|late|why.*ticket|ticket.*delay/.test(text)
+  ) {
     return { intent: "ticket_risk" };
+  }
 
-  if (/work on|prioritize|urgent tickets/.test(text))
+  // Agent priority
+  if (/work on|prioritize|urgent tickets|what should i work on/.test(text))
     return { intent: "agent_priority" };
 
   return { intent: "unknown" };
 }
+
 
 function extractTicketId(message) {
   const match = message.match(/\b\d+\b/);

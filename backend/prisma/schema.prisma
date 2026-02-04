@@ -17,6 +17,8 @@ model User {
   assigned Ticket[] @relation("AgentTickets")
 
   comments Comment[]
+
+  chatSessions ChatSession[]
 }
 
 model Ticket {
@@ -77,4 +79,34 @@ model Feedback {
   ticketId  Int      @unique
 
   ticket Ticket @relation(fields: [ticketId], references: [id])
+}
+model ChatSession {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  messages  ChatMessage[]
+  state     ChatSessionState?
+
+  user      User         @relation(fields: [userId], references: [id])
+}
+
+model ChatMessage {
+  id         Int         @id @default(autoincrement())
+  sessionId  Int
+  role       String      // "user" | "assistant"
+  content    String
+  createdAt  DateTime    @default(now())
+
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model ChatSessionState {
+  sessionId       Int      @id
+  lastTicketId    Int?
+  lastIntent      String?
+  pendingAction   String?  // JSON string (store action confirmation state)
+
+  session         ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

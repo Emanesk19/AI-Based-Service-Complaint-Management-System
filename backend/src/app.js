@@ -12,6 +12,8 @@ const attachmentRoutes = require("./routes/attachment.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
 const intelligenceRoutes = require("./routes/intelligence.routes");
 const chatbotRoutes = require("./routes/chatbot.routes");
+const chatSessionRoutes = require("./routes/chatSession.routes");
+
 
 
 app.use(cors());
@@ -30,5 +32,7 @@ app.use("/api/attachments", attachmentRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
 app.use("/api/chat", chatbotRoutes);
+app.use("/api/chat", chatbotRoutes);
+app.use("/api/chat/sessions", chatSessionRoutes);
 
 module.exports = app;
