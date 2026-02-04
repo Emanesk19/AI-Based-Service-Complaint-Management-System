@@ -10,57 +10,190 @@ exports.chat = async (req, res) => {
     const user = req.user;
 
     if (!sessionId) {
-      return res.status(400).json({ reply: "sessionId is required. Create a session first." });
+      return res
+        .status(400)
+        .json({ reply: "sessionId is required. Create a session first." });
     }
+
     if (!message) {
       return res.status(400).json({ reply: "Please enter a message." });
     }
 
-    // Validate session ownership + load state
-    const session = await chatSession.getSessionOrThrow(Number(sessionId), user.id);
+    // ─────────────────────────────────────────────
+    // 1️⃣ Load session + state
+    // ─────────────────────────────────────────────
+    const session = await chatSession.getSessionOrThrow(
+      Number(sessionId),
+      user.id
+    );
     const state = session.state;
 
-    // Save user's message
+    // Save user message
     await chatSession.addMessage(session.id, "user", message);
 
-    // Parse intent + try to extract ticketId
+    // Parse intent + ticketId
     const { intent } = chatbot.parseIntent(message);
     let ticketId = chatbot.extractTicketId(message);
 
-    // If not provided, use memory
-    if (!ticketId && state?.lastTicketId) ticketId = state.lastTicketId;
+    // Use memory if ticket not explicitly mentioned
+    if (!ticketId && state?.lastTicketId) {
+      ticketId = state.lastTicketId;
+    }
 
-    // Helper to reply + store assistant message
+    // Helper to reply
     const sendReply = async (reply, statePatch = null) => {
       await chatSession.addMessage(session.id, "assistant", reply);
-      if (statePatch) await chatSession.updateState(session.id, statePatch);
+      if (statePatch) {
+        await chatSession.updateState(session.id, statePatch);
+      }
       return res.json({ reply });
     };
 
-    // Greeting
-    if (intent === "greeting") {
-      return sendReply(`Hello ${user.name}. How can I assist you today?`, {
-        lastIntent: "greeting",
-      });
+    // ─────────────────────────────────────────────
+    // 2️⃣ HANDLE CONFIRM / CANCEL FIRST
+    // ─────────────────────────────────────────────
+    if (state?.pendingAction) {
+      if (intent === "confirm_action") {
+        const action = JSON.parse(state.pendingAction);
+
+        // ADD COMMENT
+        if (action.type === "add_comment") {
+          await prisma.comment.create({
+            data: {
+              ticketId: action.ticketId,
+              userId: user.id,
+              content: action.content,
+            },
+          });
+
+          await chatSession.updateState(session.id, { pendingAction: null });
+
+          return sendReply(
+            `Comment added to ticket ${action.ticketId}.`
+          );
+        }
+
+        // CLOSE TICKET
+        if (action.type === "close_ticket") {
+          await prisma.ticket.update({
+            where: { id: action.ticketId },
+            data: {
+              status: "Resolved",
+              closeReason: action.reason,
+              closedAt: new Date(),
+            },
+          });
+
+          await chatSession.updateState(session.id, { pendingAction: null });
+
+          return sendReply(
+            `Ticket ${action.ticketId} has been closed successfully.`
+          );
+        }
+      }
+
+      if (intent === "cancel_action") {
+        await chatSession.updateState(session.id, { pendingAction: null });
+        return sendReply("Action cancelled.");
+      }
+
+      return sendReply(
+        "Please confirm by replying 'yes' or cancel with 'no'."
+      );
     }
 
-    // Ticket-based intents
-    if (["ticket_status", "ticket_delay", "ticket_risk"].includes(intent)) {
+    // ─────────────────────────────────────────────
+    // 3️⃣ ACTION INTENTS (CRITICAL SECTION)
+    // ─────────────────────────────────────────────
+
+    // ADD COMMENT
+    if (intent === "add_comment") {
       if (!ticketId) {
-        return sendReply("Please specify the ticket number (e.g., 'ticket 2').", {
-          lastIntent: intent,
-        });
+        return sendReply("Please specify which ticket to comment on.");
       }
 
-      const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+      const content = message
+        .replace(/add comment|comment:/i, "")
+        .trim();
+
+      if (!content) {
+        return sendReply("Please provide the comment text.");
+      }
+
+      await chatSession.updateState(session.id, {
+        pendingAction: JSON.stringify({
+          type: "add_comment",
+          ticketId,
+          content,
+        }),
+      });
+
+      return sendReply(
+        `Do you want me to add this comment to ticket ${ticketId}? (yes/no)`
+      );
+    }
+
+    // CLOSE TICKET (AGENT ONLY)
+    if (intent === "close_ticket") {
+      if (user.role !== "agent") {
+        return sendReply("Only agents can close tickets.");
+      }
+
+      if (!ticketId) {
+        return sendReply("Please specify which ticket to close.");
+      }
+
+      const reason =
+        message.replace(/close|resolve/i, "").trim() ||
+        "Resolved via chatbot";
+
+      await chatSession.updateState(session.id, {
+        pendingAction: JSON.stringify({
+          type: "close_ticket",
+          ticketId,
+          reason,
+        }),
+      });
+
+      return sendReply(
+        `I will close ticket ${ticketId} with reason: "${reason}". Confirm? (yes/no)`
+      );
+    }
+
+    // ASSIGN TO ME (AGENT)
+    if (intent === "assign_to_me") {
+      if (user.role !== "agent") {
+        return sendReply("Only agents can assign tickets.");
+      }
+
+      if (!ticketId) {
+        return sendReply("Please specify which ticket.");
+      }
+
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { agentId: user.id },
+      });
+
+      return sendReply(`Ticket ${ticketId} has been assigned to you.`);
+    }
+
+    // ─────────────────────────────────────────────
+    // 4️⃣ INFO INTENTS (STATUS / RISK)
+    // ─────────────────────────────────────────────
+    if (["ticket_status", "ticket_risk"].includes(intent)) {
+      if (!ticketId) {
+        return sendReply("Please specify the ticket number.");
+      }
+
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+      });
+
       if (!ticket) {
-        return sendReply(`I could not find ticket ${ticketId}.`, {
-          lastIntent: intent,
-          lastTicketId: null,
-        });
+        return sendReply(`I could not find ticket ${ticketId}.`);
       }
 
-      // Update memory with last ticket
       await chatSession.updateState(session.id, {
         lastTicketId: ticketId,
         lastIntent: intent,
@@ -81,39 +214,22 @@ exports.chat = async (req, res) => {
         intelligence.calculateRiskScore(ticket, stats, workloads);
 
       return sendReply(
-        `Ticket ${ticketId} risk is ${score}/100 (confidence ${(confidence * 100).toFixed(
-          0
+        `Ticket ${ticketId} risk is ${score}/100 (confidence ${Math.round(
+          confidence * 100
         )}%). Reasons: ${reasoning.join("; ")}.`
       );
     }
 
-    // Agent “what should I work on”
-    if (intent === "agent_priority") {
-      if (user.role !== "agent") {
-        return sendReply("This command is available for agents only.");
-      }
-
-      const myTickets = await prisma.ticket.findMany({
-        where: { agentId: user.id, status: { not: "Resolved" } },
-        orderBy: { dueDate: "asc" },
-      });
-
-      if (myTickets.length === 0) {
-        return sendReply("You have no active tickets assigned.");
-      }
-
-      // Simple suggestion (we'll make it smarter in next step)
-      return sendReply(
-        `You have ${myTickets.length} active tickets. Start with the oldest due date and any High priority tickets.`
-      );
-    }
-
-    // Fallback
+    // ─────────────────────────────────────────────
+    // 5️⃣ FALLBACK (LAST)
+    // ─────────────────────────────────────────────
     return sendReply(
-      "I’m not sure yet. Try: 'status of ticket 2', 'is ticket 2 at risk?', or 'why is ticket 2 delayed?'."
+      "I’m not sure yet. Try: 'add comment', 'close ticket', or 'assign it to me'."
     );
   } catch (error) {
     console.error("Chatbot error:", error);
-    res.status(error.status || 500).json({ reply: error.message || "Internal chatbot error." });
+    res.status(error.status || 500).json({
+      reply: error.message || "Internal chatbot error.",
+    });
   }
 };
