@@ -27,18 +27,26 @@ model Ticket {
   priority    String
   status      String
 
-  user   User @relation("UserTickets", fields: [userId], references: [id])
-  userId Int
+  dueDate     DateTime?
+  slaHours    Int?
 
-  agent   User? @relation("AgentTickets", fields: [agentId], references: [id])
+  closedAt    DateTime?
+  closeReason String?
+
+  userId  Int
   agentId Int?
+
+  user   User  @relation("UserTickets", fields: [userId], references: [id])
+  agent  User? @relation("AgentTickets", fields: [agentId], references: [id])
+
+  comments    Comment[]
+  attachments Attachment[]
 
   createdAt DateTime @default(now())
 
-  comments Comment[]
-
-  attachments Attachment[]
+  feedbacks Feedback[]
 }
+
 
 model Comment {
   id        Int      @id @default(autoincrement())
@@ -57,6 +65,16 @@ model Attachment {
   path       String
   ticketId   Int
   uploadedAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+}
+
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  ticketId  Int      @unique
 
   ticket Ticket @relation(fields: [ticketId], references: [id])
 }

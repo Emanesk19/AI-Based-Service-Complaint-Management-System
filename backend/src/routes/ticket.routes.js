@@ -31,5 +31,26 @@ router.post(
   ticketController.updateTicketStatus
 );
 
+router.get(
+  "/overdue",
+  roleMiddleware("agent"),
+  ticketController.getOverdueTickets
+);
+
+router.post(
+  "/close",
+  authMiddleware,
+  roleMiddleware("agent"),
+  ticketController.closeTicket
+);
+
+router.post(
+  "/reopen",
+  authMiddleware,
+  roleMiddleware("user"),
+  ticketController.reopenTicket
+);
+
+
 module.exports = router;
 module.exports = router;
