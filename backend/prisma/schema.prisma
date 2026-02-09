@@ -19,6 +19,12 @@ model User {
   comments Comment[]
 
   chatSessions ChatSession[]
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activityLogs ActivityLog[]
 }
 
 model Ticket {
@@ -47,6 +53,7 @@ model Ticket {
   createdAt DateTime @default(now())
 
   feedbacks Feedback[]
+  activityLogs ActivityLog[]
 }
 
 
@@ -110,3 +117,16 @@ model ChatSessionState {
 
   session         ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int?
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // e.g., 'STATUS_CHANGE', 'ASSIGNED', 'PRIORITY_UPDATE'
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+}
+

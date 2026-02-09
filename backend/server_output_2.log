@@ -1,0 +1,3 @@
+[dotenv@17.2.3] injecting env (1) from .env -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+DB URL: postgresql://postgres:postgres123@localhost:5432/service_platform
+Server running on port 5000
