@@ -6,19 +6,17 @@ const controller = require("../controllers/analytics.controller");
 
 // All analytics endpoints require agent/admin role
 
-// Dashboard overview
+// Dashboard overview (Personal for users, Global for agents)
 router.get(
   "/dashboard",
   auth,
-  roleMiddleware("agent"),
   controller.getDashboard
 );
 
-// Trends analysis
+// Trends analysis (Personal for users, Global for agents)
 router.get(
   "/trends",
   auth,
-  roleMiddleware("agent"),
   controller.getTrends
 );
 

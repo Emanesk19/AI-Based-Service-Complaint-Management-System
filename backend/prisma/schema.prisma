@@ -7,55 +7,50 @@ datasource db {
 }
 
 model User {
-  id       Int      @id @default(autoincrement())
-  name     String
-  email    String   @unique
-  password String
-  role     String   // user, agent, admin
-
-  tickets  Ticket[] @relation("UserTickets")
-  assigned Ticket[] @relation("AgentTickets")
-
-  comments Comment[]
-
-  chatSessions ChatSession[]
-
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  activityLogs ActivityLog[]
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  password      String
+  role          String
+  createdAt     DateTime       @default(now())
+  isActive      Boolean        @default(true)
+  updatedAt     DateTime       @updatedAt
+  activityLogs  ActivityLog[]
+  chatSessions  ChatSession[]
+  comments      Comment[]
+  notifications Notification[]
+  assigned      Ticket[]       @relation("AgentTickets")
+  tickets       Ticket[]       @relation("UserTickets")
 }
 
 model Ticket {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  category    String
-  priority    String
-  status      String
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String
+  category      String
+  priority      String
+  status        String
+  userId        Int
+  agentId       Int?
+  createdAt     DateTime       @default(now())
+  closeReason   String?
+  closedAt      DateTime?
+  dueDate       DateTime?
+  slaHours      Int?
+  activityLogs  ActivityLog[]
+  attachments   Attachment[]
+  comments      Comment[]
+  feedbacks     Feedback?
+  notifications Notification[]
+  agent         User?          @relation("AgentTickets", fields: [agentId], references: [id])
+  user          User           @relation("UserTickets", fields: [userId], references: [id])
+  metadata      Json?
 
-  dueDate     DateTime?
-  slaHours    Int?
-
-  closedAt    DateTime?
-  closeReason String?
-
-  userId  Int
-  agentId Int?
-
-  user   User  @relation("UserTickets", fields: [userId], references: [id])
-  agent  User? @relation("AgentTickets", fields: [agentId], references: [id])
-
-  comments    Comment[]
-  attachments Attachment[]
-
-  createdAt DateTime @default(now())
-
-  feedbacks Feedback[]
-  activityLogs ActivityLog[]
+  @@index([status])
+  @@index([priority])
+  @@index([userId])
+  @@index([agentId])
 }
-
 
 model Comment {
   id        Int      @id @default(autoincrement())
@@ -63,9 +58,8 @@ model Comment {
   ticketId  Int
   userId    Int
   createdAt DateTime @default(now())
-
-  ticket Ticket @relation(fields: [ticketId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Attachment {
@@ -74,59 +68,86 @@ model Attachment {
   path       String
   ticketId   Int
   uploadedAt DateTime @default(now())
-
-  ticket Ticket @relation(fields: [ticketId], references: [id])
+  ticket     Ticket   @relation(fields: [ticketId], references: [id])
 }
-
 
 model Feedback {
-  id        Int      @id @default(autoincrement())
-  rating    Int
-  comment   String?
-  ticketId  Int      @unique
-
-  ticket Ticket @relation(fields: [ticketId], references: [id])
+  id       Int     @id @default(autoincrement())
+  rating   Int
+  comment  String?
+  ticketId Int     @unique
+  ticket   Ticket  @relation(fields: [ticketId], references: [id])
 }
+
 model ChatSession {
-  id        Int          @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   userId    Int
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
   messages  ChatMessage[]
+  user      User              @relation(fields: [userId], references: [id])
   state     ChatSessionState?
-
-  user      User         @relation(fields: [userId], references: [id])
 }
 
 model ChatMessage {
-  id         Int         @id @default(autoincrement())
-  sessionId  Int
-  role       String      // "user" | "assistant"
-  content    String
-  createdAt  DateTime    @default(now())
-
-  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        Int         @id @default(autoincrement())
+  sessionId Int
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model ChatSessionState {
-  sessionId       Int      @id
-  lastTicketId    Int?
-  lastIntent      String?
-  pendingAction   String?  // JSON string (store action confirmation state)
-
-  session         ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId     Int         @id
+  lastTicketId  Int?
+  lastIntent    String?
+  pendingAction String?
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model ActivityLog {
   id        Int      @id @default(autoincrement())
   ticketId  Int?
-  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  action    String   // e.g., 'STATUS_CHANGE', 'ASSIGNED', 'PRIORITY_UPDATE'
+  action    String
   oldValue  String?
   newValue  String?
   createdAt DateTime @default(now())
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
 }
 
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  ticketId  Int?
+  createdAt DateTime @default(now())
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+model Priority {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  level Int
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

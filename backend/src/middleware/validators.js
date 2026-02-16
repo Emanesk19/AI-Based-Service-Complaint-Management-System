@@ -56,24 +56,22 @@ exports.createTicketValidation = [
     .trim()
     .notEmpty()
     .withMessage("Title is required")
-    .isLength({ min: 5, max: 200 })
-    .withMessage("Title must be between 5 and 200 characters"),
+    .isLength({ min: 3, max: 200 })
+    .withMessage("Title must be between 3 and 200 characters"),
 
   body("description")
     .trim()
     .notEmpty()
     .withMessage("Description is required")
-    .isLength({ min: 10 })
-    .withMessage("Description must be at least 10 characters long"),
+    .isLength({ min: 5 })
+    .withMessage("Description must be at least 5 characters long"),
 
   body("category")
     .trim()
-    .notEmpty()
-    .withMessage("Category is required"),
+    .optional(),
 
   body("priority")
-    .notEmpty()
-    .withMessage("Priority is required")
+    .optional()
     .isIn(["Low", "Medium", "High"])
     .withMessage("Priority must be Low, Medium, or High")
 ];

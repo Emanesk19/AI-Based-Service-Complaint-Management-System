@@ -2,8 +2,9 @@ const prisma = require("./prisma");
 
 /**
  * Get comprehensive dashboard metrics
+ * @param {string} userId - Optional userId to filter for personal stats
  */
-async function getDashboardMetrics() {
+async function getDashboardMetrics(userId = null) {
   console.log("Starting getDashboardMetrics...");
   try {
     const now = new Date();
@@ -11,15 +12,24 @@ async function getDashboardMetrics() {
 
     // Overview stats
     console.log("Fetching overview stats...");
-    const totalTickets = await prisma.ticket.count();
+    const whereClause = userId ? { userId: parseInt(userId) } : {};
+
+    const totalTickets = await prisma.ticket.count({ where: whereClause });
     const openTickets = await prisma.ticket.count({
-      where: { status: { in: ["New", "In Progress", "Pending", "Reopened"] } }
+      where: { 
+        ...whereClause,
+        status: { in: ["New", "In Progress", "Pending", "Reopened"] } 
+      }
     });
     const resolvedTickets = await prisma.ticket.count({
-      where: { status: "Resolved" }
+      where: { 
+        ...whereClause,
+        status: "Resolved" 
+      }
     });
     const overdueTickets = await prisma.ticket.count({
       where: {
+        ...whereClause,
         dueDate: { lt: now },
         status: { not: "Resolved" }
       }
@@ -28,10 +38,11 @@ async function getDashboardMetrics() {
     // Recent activity (today)
     console.log("Fetching recent activity...");
     const ticketsCreatedToday = await prisma.ticket.count({
-      where: { createdAt: { gte: today } }
+      where: { ...whereClause, createdAt: { gte: today } }
     });
     const ticketsResolvedToday = await prisma.ticket.count({
       where: {
+        ...whereClause,
         status: "Resolved",
         closedAt: { gte: today }
       }
@@ -41,6 +52,7 @@ async function getDashboardMetrics() {
     console.log("Fetching avg response time...");
     const ticketsWithComments = await prisma.ticket.findMany({
       where: {
+        ...whereClause,
         comments: { some: {} }
       },
       select: {
@@ -76,6 +88,7 @@ async function getDashboardMetrics() {
     console.log("Fetching category distribution...");
     const categoryData = await prisma.ticket.groupBy({
       by: ["category"],
+      where: whereClause,
       _count: { category: true }
     });
   
@@ -87,19 +100,42 @@ async function getDashboardMetrics() {
   
     // Priority stats
     console.log("Fetching priority stats...");
-    const priorities = ["High", "Medium", "Low"];
-    const priorityStats = {};
-  
-    for (const priority of priorities) {
-      const total = await prisma.ticket.count({ where: { priority } });
-      const resolved = await prisma.ticket.count({
-        where: { priority, status: "Resolved" }
-      });
-      const pending = total - resolved;
-  
-      priorityStats[priority.toLowerCase()] = { total, resolved, pending };
-    }
+    const priorityData = await prisma.ticket.groupBy({
+      by: ["priority", "status"],
+      where: whereClause,
+      _count: { id: true }
+    });
+
+    const priorityStats = {
+      high: { total: 0, resolved: 0, pending: 0 },
+      medium: { total: 0, resolved: 0, pending: 0 },
+      low: { total: 0, resolved: 0, pending: 0 }
+    };
+
+    priorityData.forEach(item => {
+      const p = item.priority.toLowerCase();
+      if (priorityStats[p]) {
+        priorityStats[p].total += item._count.id;
+        if (item.status === "Resolved") {
+          priorityStats[p].resolved += item._count.id;
+        } else {
+          priorityStats[p].pending += item._count.id;
+        }
+      }
+    });
     
+    // Recent tickets for the dashboard table
+    console.log("Fetching recent tickets...");
+    const recentTickets = await prisma.ticket.findMany({
+      where: whereClause,
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: { select: { name: true, email: true } },
+        agent: { select: { name: true } }
+      }
+    });
+
     console.log("Finished getDashboardMetrics");
   
     return {
@@ -115,7 +151,8 @@ async function getDashboardMetrics() {
         avgResponseTime
       },
       categoryDistribution,
-      priorityStats
+      priorityStats,
+      recentTickets
     };
 
   } catch (error) {
@@ -128,8 +165,10 @@ async function getDashboardMetrics() {
 /**
  * Get trend data for specified period
  * @param {string} period - "daily", "weekly", or "monthly"
+ * @param {string} userId - Optional userId to filter for personal stats
  */
-async function getTrendData(period = "weekly") {
+async function getTrendData(period = "weekly", userId = null) {
+  const whereClause = userId ? { userId: parseInt(userId) } : {};
   const now = new Date();
   let intervals = [];
   let groupByFormat;
@@ -182,6 +221,7 @@ async function getTrendData(period = "weekly") {
     intervals.map(async (interval) => {
       const created = await prisma.ticket.count({
         where: {
+          ...whereClause,
           createdAt: {
             gte: interval.start,
             lt: interval.end
@@ -191,6 +231,7 @@ async function getTrendData(period = "weekly") {
 
       const resolved = await prisma.ticket.count({
         where: {
+          ...whereClause,
           closedAt: {
             gte: interval.start,
             lt: interval.end
@@ -202,6 +243,7 @@ async function getTrendData(period = "weekly") {
       // Avg resolution time for this period
       const resolvedTickets = await prisma.ticket.findMany({
         where: {
+          ...whereClause,
           closedAt: {
             gte: interval.start,
             lt: interval.end

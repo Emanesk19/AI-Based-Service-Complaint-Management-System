@@ -19,6 +19,9 @@ router.post(
 
 router.get("/my", authMiddleware, ticketController.getMyTickets);
 
+// Smart base route for tickets
+router.get("/", authMiddleware, ticketController.getTickets);
+
 // Get all tickets with pagination and filtering (agents/admins)
 router.get(
   "/all",

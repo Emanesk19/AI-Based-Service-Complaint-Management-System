@@ -7,7 +7,13 @@ const predictionService = require("../services/prediction.service");
  */
 exports.getDashboard = async (req, res) => {
   try {
-    const dashboardData = await analyticsService.getDashboardMetrics();
+    const userId = req.user.id;
+    const role = req.user.role;
+    
+    // Agents/Admins see global stats, regular users see personal stats
+    const filterUserId = (role === 'admin' || role === 'agent') ? null : userId;
+    
+    const dashboardData = await analyticsService.getDashboardMetrics(filterUserId);
     res.json(dashboardData);
   } catch (error) {
     console.error("Dashboard analytics error:", error);
@@ -22,6 +28,8 @@ exports.getDashboard = async (req, res) => {
 exports.getTrends = async (req, res) => {
   try {
     const { period = "weekly" } = req.query;
+    const userId = req.user.id;
+    const role = req.user.role;
     
     if (!["daily", "weekly", "monthly"].includes(period)) {
       return res.status(400).json({
@@ -29,7 +37,10 @@ exports.getTrends = async (req, res) => {
       });
     }
 
-    const trendData = await analyticsService.getTrendData(period);
+    // Role-based filtering
+    const filterUserId = (role === 'admin' || role === 'agent') ? null : userId;
+
+    const trendData = await analyticsService.getTrendData(period, filterUserId);
     res.json(trendData);
   } catch (error) {
     console.error("Trends analytics error:", error);

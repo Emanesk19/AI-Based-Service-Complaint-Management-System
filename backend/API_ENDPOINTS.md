@@ -13,6 +13,33 @@
 | `GET` | `/api/analytics/recommend-agent/:id` | **Agent** | AI agent assignment recommendation |
 | `GET` | `/api/analytics/ticket-clustering` | **Agent** | Identify recurring issue patterns |
 
+## 🔔 Notifications (Phase 2.1)
+
+| Method | Endpoint | Required Role | Description |
+|--------|----------|---------------|-------------|
+| `GET` | `/api/notifications` | **Authenticated** | Get user's notifications |
+| `PUT` | `/api/notifications/read-all` | **Authenticated** | Mark all as read |
+| `PUT` | `/api/notifications/:id/read` | **Authenticated** | Mark specific notification as read |
+| `DELETE` | `/api/notifications/:id` | **Authenticated** | Delete a notification |
+
+## ⚙️ Configuration (Phase 2.2)
+
+| Method | Endpoint | Required Role | Description |
+|--------|----------|---------------|-------------|
+| `GET` | `/api/config/categories` | **Authenticated** | List all ticket categories |
+| `GET` | `/api/config/priorities` | **Authenticated** | List all ticket priorities |
+| `POST` | `/api/config/categories` | **Admin** | Create new category |
+| `DELETE` | `/api/config/categories/:id` | **Admin** | Delete category |
+| `POST` | `/api/config/priorities` | **Admin** | Create new priority |
+| `DELETE` | `/api/config/priorities/:id` | **Admin** | Delete priority |
+
+## 📊 Reporting & Exports (Phase 3.3)
+
+| Method | Endpoint | Required Role | Description |
+|--------|----------|---------------|-------------|
+| `GET` | `/api/reports/export/csv` | **Admin** | Export tickets to CSV (supports filters) |
+| `GET` | `/api/reports/export/pdf` | **Admin** | Export summary dashboard to PDF |
+
 ## Quick stats
 
 | Method | Endpoint | Required Role | Description |

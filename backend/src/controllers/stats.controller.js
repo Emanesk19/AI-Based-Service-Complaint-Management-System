@@ -6,24 +6,35 @@ const prisma = require("../services/prisma");
  */
 exports.getSummary = async (req, res) => {
   try {
+    const userId = req.user.id;
+    const role = req.user.role;
+
+    // Determine filter: regular users see only their own stats
+    const whereClause = (role === 'admin' || role === 'agent') ? {} : { userId };
+
     // Total tickets count
-    const totalTickets = await prisma.ticket.count();
+    const totalTickets = await prisma.ticket.count({ where: whereClause });
 
     // Count by status
     const openTickets = await prisma.ticket.count({
       where: {
+        ...whereClause,
         status: { in: ["New", "In Progress", "Pending", "Reopened"] }
       }
     });
 
     const resolvedTickets = await prisma.ticket.count({
-      where: { status: "Resolved" }
+      where: { 
+        ...whereClause,
+        status: "Resolved" 
+      }
     });
 
     // Overdue tickets (past due date and not resolved)
     const now = new Date();
     const overdueTickets = await prisma.ticket.count({
       where: {
+        ...whereClause,
         dueDate: { lt: now },
         status: { not: "Resolved" }
       }
@@ -32,6 +43,7 @@ exports.getSummary = async (req, res) => {
     // Average resolution time (in hours)
     const resolvedWithTimes = await prisma.ticket.findMany({
       where: {
+        ...whereClause,
         status: "Resolved",
         closedAt: { not: null }
       },
@@ -50,22 +62,26 @@ exports.getSummary = async (req, res) => {
       avgResolutionHours = Math.round((totalHours / resolvedWithTimes.length) * 100) / 100;
     }
 
-    // Count by priority
-    const highPriorityCount = await prisma.ticket.count({
-      where: { priority: "High", status: { not: "Resolved" } }
+    // Count by priority (for user, only show their own priorities)
+    const priorityCounts = await prisma.ticket.groupBy({
+      by: ["priority"],
+      where: {
+        ...whereClause,
+        status: { not: "Resolved" }
+      },
+      _count: { id: true }
     });
 
-    const mediumPriorityCount = await prisma.ticket.count({
-      where: { priority: "Medium", status: { not: "Resolved" } }
-    });
+    const priorityBreakdown = {
+      high: priorityCounts.find(p => p.priority === "High")?._count.id || 0,
+      medium: priorityCounts.find(p => p.priority === "Medium")?._count.id || 0,
+      low: priorityCounts.find(p => p.priority === "Low")?._count.id || 0
+    };
 
-    const lowPriorityCount = await prisma.ticket.count({
-      where: { priority: "Low", status: { not: "Resolved" } }
-    });
-
-    // Unassigned tickets
+    // Unassigned tickets (for user, this might be less relevant but kept for consistency)
     const unassignedTickets = await prisma.ticket.count({
       where: {
+        ...whereClause,
         agentId: null,
         status: { not: "Resolved" }
       }
@@ -77,11 +93,7 @@ exports.getSummary = async (req, res) => {
       resolvedTickets,
       overdueTickets,
       avgResolutionHours,
-      priorityBreakdown: {
-        high: highPriorityCount,
-        medium: mediumPriorityCount,
-        low: lowPriorityCount
-      },
+      priorityBreakdown,
       unassignedTickets
     });
   } catch (error) {
